@@ -5,10 +5,14 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter/cupertino.dart';
 
-const piAddress = 'http://10.85.160.236:5000'; // your Pi's static IP
+// Default Pi's static IP address (can be changed in settings)
+const piAddress = 'http://10.85.160.236:5000';
 
+// Entry point: launches the Baby Monitor app
 void main() => runApp(BabyMonitorApp());
 
+/// The root widget for the Baby Monitor app.
+/// Sets up the theme and home navigation.
 class BabyMonitorApp extends StatelessWidget {
   const BabyMonitorApp({super.key});
 
@@ -29,6 +33,7 @@ class BabyMonitorApp extends StatelessWidget {
 
 // ── Main Navigation ─────────────────────────────────────────────────────────
 
+/// Main navigation widget with bottom navigation bar for Live and History screens.
 class MainNavigation extends StatefulWidget {
   const MainNavigation({super.key});
 
@@ -37,6 +42,7 @@ class MainNavigation extends StatefulWidget {
 }
 
 class _MainNavigationState extends State<MainNavigation> {
+  // Tracks selected tab (Live or History)
   int _selectedIndex = 0;
 
   final List<Widget> _pages = [
@@ -68,6 +74,7 @@ class _MainNavigationState extends State<MainNavigation> {
 
 // ── History Screen ──────────────────────────────────────────────────────────
 
+/// Screen for displaying historical vitals data (1, 6, 12, 24 hours).
 class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key});
 
@@ -76,6 +83,7 @@ class HistoryScreen extends StatefulWidget {
 }
 
 class _HistoryScreenState extends State<HistoryScreen> {
+  // State for selected time window, loading, error, and vitals data
   int _selectedHours = 1;
   bool _loading = false;
   String? _error;
@@ -97,6 +105,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     super.dispose();
   }
 
+  /// Starts periodic polling for history data
   void _startTimer() {
     _timer?.cancel();
     Duration interval;
@@ -120,6 +129,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     _timer = Timer.periodic(interval, (_) => _fetchHistory());
   }
 
+  /// Fetches historical data from the Pi for the selected time window
   Future<void> _fetchHistory() async {
     String endpoint;
     switch (_selectedHours) {
@@ -162,6 +172,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     }
   }
 
+  /// Builds the hour selector chips
   Widget _buildSelector() {
     final options = [1, 6, 12, 24];
     return Row(
@@ -192,6 +203,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     );
   }
 
+  /// Builds a chart for a single vital sign
   Widget _buildChart(String label, List<double> data, Color color, String unit) {
     if (data.isEmpty) return Container();
     final min = data.reduce((a, b) => a < b ? a : b);
@@ -276,6 +288,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
 // ── Data model ──────────────────────────────────────────────────────────────
 
+/// Simple data model for a set of vitals
 class VitalsData {
   double spo2;
   double pulse;
@@ -286,6 +299,7 @@ class VitalsData {
 
 // ── Waveform painter ─────────────────────────────────────────────────────────
 
+/// Custom painter for drawing a mini waveform for a vital sign
 class WavePainter extends CustomPainter {
   final List<double> history;
   final double minVal;
@@ -331,6 +345,7 @@ class WavePainter extends CustomPainter {
 
 // ── Trend chart painter ──────────────────────────────────────────────────────
 
+/// Custom painter for the trend chart (last 60s) showing all three vitals
 class TrendPainter extends CustomPainter {
   final List<double> spo2History;
   final List<double> pulseHistory;
@@ -342,7 +357,8 @@ class TrendPainter extends CustomPainter {
     required this.tempHistory,
   });
 
-  void _drawLine(Canvas canvas, Size size, List<double> history,
+    /// Draws a single line for a vital
+    void _drawLine(Canvas canvas, Size size, List<double> history,
       double minVal, double maxVal, Color color) {
     if (history.length < 2) return;
     final paint = Paint()
@@ -367,6 +383,7 @@ class TrendPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    // Draws a faint baseline
     // Baseline
     final linePaint = Paint()
       ..color = Colors.grey.withOpacity(0.2)
@@ -403,6 +420,7 @@ class TrendPainter extends CustomPainter {
 
 // ── Main screen ──────────────────────────────────────────────────────────────
 
+/// Main screen for live monitoring of vitals
 class BabyMonitorScreen extends StatefulWidget {
   const BabyMonitorScreen({super.key});
 
@@ -410,8 +428,8 @@ class BabyMonitorScreen extends StatefulWidget {
   State<BabyMonitorScreen> createState() => _BabyMonitorScreenState();
 }
 
-class _BabyMonitorScreenState extends State<BabyMonitorScreen>
     with SingleTickerProviderStateMixin {
+  // Timer for polling, animation controller for live indicator
   Timer? _timer;
   late AnimationController _dotController;
 
@@ -430,10 +448,11 @@ class _BabyMonitorScreenState extends State<BabyMonitorScreen>
   String _timestamp = '';
   String _sinceDuration = '';
 
-  // Editable fields
+  // Editable fields (user can change in settings)
   String _age = '3 months';
   String _weight = '12.4 lbs';
   String _piAddress = piAddress;
+  /// Opens the settings dialog for Pi IP, age, and weight
   void _openSettingsDialog() async {
     final ipController = TextEditingController(text: _piAddress);
     final ageController = TextEditingController(text: _age);
@@ -488,13 +507,14 @@ class _BabyMonitorScreenState extends State<BabyMonitorScreen>
     }
   }
 
-  // Track previous alert state
+  // Track previous alert state for transition detection
   bool _wasSpo2Alert = false;
   bool _wasPulseAlert = false;
   bool _wasTempAlert = false;
 
   @override
   void initState() {
+    // Initialize timers and animation
     super.initState();
     _startTime = DateTime.now();
     _dotController = AnimationController(
@@ -513,6 +533,7 @@ class _BabyMonitorScreenState extends State<BabyMonitorScreen>
     super.dispose();
   }
 
+  /// Fetches latest data from the Pi and updates state
   Future<void> _fetchAndUpdate() async {
     final now = DateTime.now();
     final elapsed = now.difference(_startTime);
@@ -570,6 +591,7 @@ class _BabyMonitorScreenState extends State<BabyMonitorScreen>
     });
   }
 
+  /// Returns true if value is in the normal range
   bool _isNormal(double val, double min, double max) => val >= min && val <= max;
 
   @override
@@ -936,6 +958,7 @@ class _BabyMonitorScreenState extends State<BabyMonitorScreen>
 
 // ── Vital card widget ────────────────────────────────────────────────────────
 
+/// Card widget for displaying a single vital (SpO₂, Pulse, Temp)
 class _VitalCard extends StatelessWidget {
   final String label;
   final String value;
